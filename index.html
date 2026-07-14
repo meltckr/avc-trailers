@@ -369,6 +369,58 @@
     font-weight: 500;
   }
   footer svg { opacity: 0.6; }
+
+  /* Screen time */
+  .timer-chip {
+    margin-left: auto;
+    display: flex; align-items: center; gap: 6px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    font-family: inherit; font-size: 12.5px; font-weight: 600;
+    padding: 8px 13px; border-radius: 999px; cursor: pointer;
+    transition: all 0.2s ease;
+    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+    flex-shrink: 0;
+  }
+  .timer-chip:hover { color: var(--text); border-color: var(--border-strong); }
+  .timer-chip.warn { color: #ffb86b; border-color: rgba(255, 184, 107, 0.45); box-shadow: 0 0 14px rgba(255, 184, 107, 0.15); }
+
+  .sheet, .break-card {
+    background: var(--card-solid);
+    border: 1px solid var(--border-strong);
+    border-radius: 22px;
+    padding: 26px 24px;
+    width: 100%;
+    max-width: 400px;
+    box-shadow: 0 0 60px rgba(79, 140, 255, 0.15), 0 24px 60px rgba(0, 0, 0, 0.6);
+    animation: rise 0.3s ease both;
+  }
+  .sheet h2 { font-family: 'Space Grotesk', 'Inter', sans-serif; font-size: 17px; font-weight: 700; margin-bottom: 6px; }
+  .sheet-sub { color: var(--muted); font-size: 13px; margin-bottom: 18px; }
+  .limit-opts { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-bottom: 14px; }
+  .limit-opts button {
+    background: var(--bg-2); border: 1px solid var(--border); color: var(--muted);
+    font-family: inherit; font-size: 13px; font-weight: 600;
+    padding: 11px 0; border-radius: 11px; cursor: pointer; transition: all 0.2s ease;
+  }
+  .limit-opts button:hover { color: var(--text); border-color: var(--border-strong); }
+  .limit-opts button.active { background: linear-gradient(135deg, #4f8cff, #2f5fd0); border-color: transparent; color: #fff; box-shadow: 0 4px 14px var(--glow); }
+  .sheet-note { font-size: 11.5px; color: var(--muted); line-height: 1.5; }
+
+  .break-card { text-align: center; padding: 36px 28px; }
+  .break-card .bigmoon { filter: drop-shadow(0 0 24px var(--glow)); margin-bottom: 14px; }
+  .break-card h2 { font-family: 'Space Grotesk', 'Inter', sans-serif; font-size: 22px; font-weight: 700; margin-bottom: 8px; }
+  .break-card p { color: var(--muted); font-size: 14px; line-height: 1.55; margin-bottom: 22px; }
+  .btn {
+    display: block; width: 100%; padding: 13px; border-radius: 12px;
+    font-family: inherit; font-size: 14px; font-weight: 700; cursor: pointer; transition: all 0.2s ease;
+  }
+  .btn-primary { background: linear-gradient(135deg, #4f8cff, #2f5fd0); border: none; color: #fff; margin-bottom: 10px; box-shadow: 0 4px 18px var(--glow); }
+  .btn-primary:hover { filter: brightness(1.1); }
+  .btn-ghost { background: transparent; border: 1px solid var(--border-strong); color: var(--text); }
+  .btn-ghost:hover { border-color: var(--accent-2); }
+  .tiny-link { background: none; border: none; color: var(--muted); font-family: inherit; font-size: 12px; text-decoration: underline; cursor: pointer; margin-top: 6px; }
 </style>
 </head>
 <body>
@@ -382,6 +434,10 @@
       <h1>Fearless Moon Trailers</h1>
       <div class="sub">Authentic trailers only &middot; newest to oldest</div>
     </div>
+    <button class="timer-chip" id="timerChip" aria-label="Screen time">
+      <svg viewBox="0 0 24 24" width="14" height="14"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" fill="currentColor"/></svg>
+      <span id="timerText">0m</span>
+    </button>
   </div>
   <nav class="genres" id="genreBar" style="display:none"></nav>
 </header>
@@ -405,6 +461,40 @@
     <div class="official-tag">
       <svg viewBox="0 0 24 24"><path d="M12 2L4 6v6c0 5.25 3.4 10.15 8 11.35C16.6 22.15 20 17.25 20 12V6l-8-4zm-1.2 14.5l-3.5-3.5 1.4-1.4 2.1 2.1 4.6-4.6 1.4 1.4-6 6z"/></svg>
       Official studio upload &middot; verified via TMDB
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="limitSheet">
+  <div class="sheet">
+    <h2>Screen time</h2>
+    <div class="sheet-sub" id="usageLine"></div>
+    <div class="limit-opts" id="limitOpts">
+      <button data-min="15">15m</button>
+      <button data-min="30">30m</button>
+      <button data-min="45">45m</button>
+      <button data-min="60">1h</button>
+      <button data-min="0">Off</button>
+    </div>
+    <div class="sheet-note">When you hit your limit, the moon gently suggests a break. Time only counts while the app is open on screen, and resets at midnight.</div>
+    <button class="btn btn-ghost" id="limitClose" style="margin-top:18px">Done</button>
+  </div>
+</div>
+
+<div class="modal" id="breakModal">
+  <div class="break-card">
+    <div id="breakMain">
+      <svg class="bigmoon" viewBox="0 0 24 24" width="54" height="54"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" fill="#7aa8ff"/></svg>
+      <h2>Time for a breather</h2>
+      <p id="breakLine"></p>
+      <button class="btn btn-primary" id="doneBtn">I&rsquo;m done for now</button>
+      <button class="btn btn-ghost" id="snoozeBtn">5 more minutes</button>
+    </div>
+    <div id="goodnight" style="display:none">
+      <svg class="bigmoon" viewBox="0 0 24 24" width="54" height="54"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" fill="#7aa8ff"/></svg>
+      <h2>Goodnight</h2>
+      <p>The trailers will still be here tomorrow.</p>
+      <button class="tiny-link" id="resumeLink">keep browsing anyway</button>
     </div>
   </div>
 </div>
@@ -638,6 +728,102 @@
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeModal(); });
 
   el('loadMore').addEventListener('click', loadPage);
+
+  // ---- Screen time / anti-doomscroll ----
+  var storedLimit = localStorage.getItem('fm_limit');
+  var stLimit = storedLimit === null ? 30 : (parseInt(storedLimit, 10) || 0);
+  function loadDay(k) {
+    try { var v = JSON.parse(localStorage.getItem(k)); if (v && v.d === today()) return v; } catch (e) {}
+    return null;
+  }
+  var use = loadDay('fm_use') || { d: today(), s: 0 };
+  var snz = loadDay('fm_snooze') || { d: today(), m: 0 };
+  var breakOpen = false, doneMode = false;
+
+  function saveST() {
+    localStorage.setItem('fm_use', JSON.stringify(use));
+    localStorage.setItem('fm_snooze', JSON.stringify(snz));
+  }
+  function fmtMin(s) {
+    var m = Math.floor(s / 60);
+    if (m < 60) return m + 'm';
+    return Math.floor(m / 60) + 'h ' + (m % 60 < 10 ? '0' : '') + (m % 60) + 'm';
+  }
+  function updateChip() {
+    el('timerText').textContent = fmtMin(use.s);
+    var warn = stLimit > 0 && use.s >= (stLimit + snz.m) * 60 * 0.8;
+    el('timerChip').classList.toggle('warn', warn);
+  }
+  function showBreak() {
+    breakOpen = true;
+    closeModal();
+    el('breakLine').textContent = 'You’ve been watching trailers for ' + fmtMin(use.s) + ' today. The moon suggests a breather.';
+    el('breakMain').style.display = 'block';
+    el('goodnight').style.display = 'none';
+    el('breakModal').classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+  function checkLimit() {
+    if (!doneMode && !breakOpen && stLimit > 0 && use.s >= (stLimit + snz.m) * 60) showBreak();
+  }
+  var lastTick = Date.now();
+  document.addEventListener('visibilitychange', function () { lastTick = Date.now(); });
+  setInterval(function () {
+    var now = Date.now();
+    if (document.visibilityState === 'visible' && !doneMode) {
+      if (use.d !== today()) { use = { d: today(), s: 0 }; snz = { d: today(), m: 0 }; }
+      use.s += Math.min(Math.round((now - lastTick) / 1000), 30);
+      saveST(); updateChip(); checkLimit();
+    }
+    lastTick = now;
+  }, 5000);
+
+  function markActiveLimit() {
+    Array.prototype.forEach.call(el('limitOpts').children, function (b) {
+      b.classList.toggle('active', parseInt(b.getAttribute('data-min'), 10) === stLimit);
+    });
+  }
+  function closeSheet() {
+    el('limitSheet').classList.remove('open');
+    document.body.style.overflow = '';
+    checkLimit();
+  }
+  el('timerChip').addEventListener('click', function () {
+    el('usageLine').textContent = 'You’ve spent ' + fmtMin(use.s) + ' here today.';
+    markActiveLimit();
+    el('limitSheet').classList.add('open');
+    document.body.style.overflow = 'hidden';
+  });
+  el('limitOpts').addEventListener('click', function (e) {
+    var b = e.target.closest ? e.target.closest('button') : null;
+    if (!b) return;
+    stLimit = parseInt(b.getAttribute('data-min'), 10);
+    localStorage.setItem('fm_limit', String(stLimit));
+    markActiveLimit(); updateChip();
+  });
+  el('limitClose').addEventListener('click', closeSheet);
+  el('limitSheet').addEventListener('click', function (e) { if (e.target === el('limitSheet')) closeSheet(); });
+
+  el('snoozeBtn').addEventListener('click', function () {
+    snz.m += 5; saveST(); breakOpen = false;
+    el('breakModal').classList.remove('open');
+    document.body.style.overflow = '';
+    updateChip();
+  });
+  el('doneBtn').addEventListener('click', function () {
+    doneMode = true;
+    el('breakMain').style.display = 'none';
+    el('goodnight').style.display = 'block';
+  });
+  el('resumeLink').addEventListener('click', function () {
+    doneMode = false; snz.m += 5; saveST(); breakOpen = false;
+    el('breakModal').classList.remove('open');
+    document.body.style.overflow = '';
+    updateChip();
+  });
+
+  updateChip();
+  checkLimit();
 
   buildGenreBar();
   resetAndLoad();
