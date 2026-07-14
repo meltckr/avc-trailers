@@ -22,6 +22,8 @@
 <meta name="apple-mobile-web-app-title" content="Fearless Moon">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://api.themoviedb.org">
+<link rel="preconnect" href="https://image.tmdb.org">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <style>
   :root {
@@ -370,6 +372,59 @@
   }
   footer svg { opacity: 0.6; }
 
+  /* Browse controls */
+  .controls { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 16px; }
+  .seg {
+    display: flex; background: var(--card); border: 1px solid var(--border);
+    border-radius: 999px; padding: 3px;
+    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+    flex-shrink: 0;
+  }
+  .seg button {
+    background: none; border: none; color: var(--muted);
+    font-family: inherit; font-size: 13px; font-weight: 600;
+    padding: 8px 16px; border-radius: 999px; cursor: pointer; transition: all 0.2s ease;
+  }
+  .seg button.active { background: linear-gradient(135deg, #4f8cff, #2f5fd0); color: #fff; box-shadow: 0 2px 12px var(--glow); }
+  .search-wrap { flex: 1; min-width: 200px; position: relative; display: flex; align-items: center; }
+  .search-wrap .mag { position: absolute; left: 14px; opacity: 0.6; pointer-events: none; }
+  .search-wrap input {
+    width: 100%;
+    background: var(--card); border: 1px solid var(--border); border-radius: 999px;
+    color: var(--text); font-family: inherit; font-size: 14px;
+    padding: 10px 40px 10px 38px;
+    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+    transition: border-color 0.2s ease;
+    -webkit-appearance: none; appearance: none;
+  }
+  .search-wrap input:focus { outline: none; border-color: var(--border-strong); }
+  .search-wrap input::placeholder { color: var(--muted); }
+  .search-wrap input::-webkit-search-cancel-button { display: none; }
+  #searchClear {
+    position: absolute; right: 8px;
+    width: 26px; height: 26px; border-radius: 50%;
+    background: var(--bg-2); border: 1px solid var(--border); color: var(--muted);
+    font-family: inherit; font-size: 14px; line-height: 1; cursor: pointer;
+    display: none; align-items: center; justify-content: center;
+  }
+  #searchClear:hover { color: var(--text); border-color: var(--border-strong); }
+  .seen-badge {
+    position: absolute; top: 10px; left: 10px;
+    display: flex; align-items: center; gap: 4px;
+    background: rgba(7, 11, 24, 0.72);
+    border: 1px solid rgba(111, 216, 143, 0.5);
+    color: #6fd88f;
+    font-size: 10px; font-weight: 700; letter-spacing: 0.3px;
+    padding: 4px 8px; border-radius: 999px;
+    backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+    z-index: 1;
+  }
+  .modal-meta { margin-top: 12px; font-size: 13px; font-weight: 600; color: #ffd166; }
+  .modal-overview {
+    margin-top: 8px; color: var(--muted); font-size: 13.5px; line-height: 1.55;
+    display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+  }
+
   /* Screen time */
   .timer-chip {
     margin-left: auto;
@@ -444,6 +499,17 @@
 
 <main>
   <div id="appScreen">
+    <div class="controls">
+      <div class="seg" id="modeSeg">
+        <button class="active" data-mode="now">Out Now</button>
+        <button data-mode="soon">Coming Soon</button>
+      </div>
+      <div class="search-wrap">
+        <svg class="mag" viewBox="0 0 24 24" width="16" height="16"><path d="M15.5 14h-.79l-.28-.27a6.5 6.5 0 1 0-.7.7l.27.28v.79l5 4.99L20.49 19zm-6 0A4.5 4.5 0 1 1 14 9.5 4.5 4.5 0 0 1 9.5 14z" fill="#8b95b5"/></svg>
+        <input id="searchInput" type="search" placeholder="Search any movie&hellip;" autocomplete="off" spellcheck="false">
+        <button id="searchClear" aria-label="Clear search">&times;</button>
+      </div>
+    </div>
     <div class="sort-note" id="sortNote"></div>
     <div class="grid" id="grid"></div>
     <div id="statusArea"></div>
@@ -458,6 +524,8 @@
       <button class="close-btn" id="modalClose" aria-label="Close">&times;</button>
     </div>
     <div class="video-frame"><iframe id="ytFrame" src="" allow="autoplay; encrypted-media; fullscreen" allowfullscreen title="Trailer"></iframe></div>
+    <div class="modal-meta" id="modalRating"></div>
+    <p class="modal-overview" id="modalOverview"></p>
     <div class="official-tag">
       <svg viewBox="0 0 24 24"><path d="M12 2L4 6v6c0 5.25 3.4 10.15 8 11.35C16.6 22.15 20 17.25 20 12V6l-8-4zm-1.2 14.5l-3.5-3.5 1.4-1.4 2.1 2.1 4.6-4.6 1.4 1.4-6 6z"/></svg>
       Official studio upload &middot; verified via TMDB
@@ -537,11 +605,16 @@
   var state = {
     key: localStorage.getItem(KEY_STORE) || DEFAULT_KEY,
     genre: 0,
+    mode: 'now', // 'now' = released, 'soon' = upcoming
+    query: '',
     page: 0,
     loading: false,
     done: false,
     shown: {} // movie ids already rendered
   };
+
+  var watched = {};
+  try { watched = JSON.parse(localStorage.getItem('fm_watched')) || {}; } catch (e) {}
 
   var el = function (id) { return document.getElementById(id); };
 
@@ -567,6 +640,14 @@
 
   function today() {
     var d = new Date();
+    var m = String(d.getMonth() + 1).padStart(2, '0');
+    var day = String(d.getDate()).padStart(2, '0');
+    return d.getFullYear() + '-' + m + '-' + day;
+  }
+
+  function plusDays(n) {
+    var d = new Date();
+    d.setDate(d.getDate() + n);
     var m = String(d.getMonth() + 1).padStart(2, '0');
     var day = String(d.getDate()).padStart(2, '0');
     return d.getFullYear() + '-' + m + '-' + day;
@@ -605,17 +686,33 @@
     el('loadMore').disabled = true;
     if (state.page === 1) setStatus('<div class="spinner"></div>');
 
-    var params = {
-      sort_by: 'primary_release_date.desc',
-      'primary_release_date.lte': today(),
-      'vote_count.gte': 10,
-      include_adult: 'false',
-      language: 'en-US',
-      page: state.page
-    };
-    if (state.genre) params.with_genres = state.genre;
+    var req;
+    if (state.query) {
+      req = tmdb('/search/movie', {
+        query: state.query,
+        include_adult: 'false',
+        language: 'en-US',
+        page: state.page
+      });
+    } else {
+      var params = {
+        include_adult: 'false',
+        language: 'en-US',
+        page: state.page
+      };
+      if (state.mode === 'soon') {
+        params.sort_by = 'popularity.desc';
+        params['primary_release_date.gte'] = plusDays(1);
+      } else {
+        params.sort_by = 'primary_release_date.desc';
+        params['primary_release_date.lte'] = today();
+        params['vote_count.gte'] = 10;
+      }
+      if (state.genre) params.with_genres = state.genre;
+      req = tmdb('/discover/movie', params);
+    }
 
-    tmdb('/discover/movie', params).then(function (data) {
+    req.then(function (data) {
       if (state.page >= (data.total_pages || 1)) state.done = true;
       var movies = (data.results || []).filter(function (m) { return !state.shown[m.id]; });
 
@@ -639,7 +736,7 @@
 
       var haveCards = el('grid').children.length > 0;
       if (!haveCards && state.done) {
-        setStatus('<div class="status-msg"><svg viewBox="0 0 24 24" width="34" height="34"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" fill="#8b95b5"/></svg>No trailers found for this genre.</div>');
+        setStatus('<div class="status-msg"><svg viewBox="0 0 24 24" width="34" height="34"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" fill="#8b95b5"/></svg>No trailers found.</div>');
       } else if (!haveCards && !state.done) {
         // Whole page filtered out — auto-advance
         loadPage();
@@ -667,10 +764,11 @@
       : '<div class="poster-fallback">' + escapeHtml(m.title) + '</div>';
     card.innerHTML =
       '<div class="poster-wrap">' + posterHtml +
+      '<div class="seen-badge"' + (watched[m.id] ? '' : ' style="display:none"') + '><svg viewBox="0 0 24 24" width="11" height="11"><path d="M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z" fill="currentColor"/></svg>Seen</div>' +
       '<div class="play-badge"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></div></div>' +
       '<div class="card-info"><div class="name">' + escapeHtml(m.title) + '</div>' +
       '<div class="date">' + fmtDate(m.release_date) + '</div></div>';
-    card.addEventListener('click', function () { openModal(m, trailer); });
+    card.addEventListener('click', function () { openModal(m, trailer, card); });
     el('grid').appendChild(card);
   }
 
@@ -680,12 +778,25 @@
     });
   }
 
-  function openModal(m, trailer) {
+  function openModal(m, trailer, card) {
     var yr = m.release_date ? m.release_date.slice(0, 4) : '';
     el('modalTitle').innerHTML = escapeHtml(m.title) + (yr ? ' <span class="yr">(' + yr + ')</span>' : '');
     el('ytFrame').src = 'https://www.youtube-nocookie.com/embed/' + trailer.key + '?autoplay=1&rel=0';
+    var meta = [];
+    if (m.vote_average) meta.push('★ ' + m.vote_average.toFixed(1));
+    if (m.release_date) meta.push(m.release_date > today() ? 'In theaters ' + fmtDate(m.release_date) : fmtDate(m.release_date));
+    el('modalRating').textContent = meta.join(' · ');
+    el('modalOverview').textContent = m.overview || '';
     el('modal').classList.add('open');
     document.body.style.overflow = 'hidden';
+    if (!watched[m.id]) {
+      watched[m.id] = 1;
+      try { localStorage.setItem('fm_watched', JSON.stringify(watched)); } catch (e) {}
+      if (card) {
+        var b = card.querySelector('.seen-badge');
+        if (b) b.style.display = '';
+      }
+    }
   }
 
   function closeModal() {
@@ -700,8 +811,17 @@
     state.shown = {};
     el('grid').innerHTML = '';
     el('loadMore').style.display = 'none';
-    var g = GENRES.filter(function (x) { return x.id === state.genre; })[0];
-    el('sortNote').innerHTML = MOON_SVG + '<span>' + (g && g.id ? g.name : 'All genres') + ' · latest release first · official trailers only</span>';
+    var label;
+    if (state.query) {
+      label = 'Results for “' + state.query + '” · official trailers only';
+    } else {
+      var g = GENRES.filter(function (x) { return x.id === state.genre; })[0];
+      var gname = g && g.id ? g.name : 'All genres';
+      label = state.mode === 'soon'
+        ? gname + ' · coming soon · most anticipated first'
+        : gname + ' · latest release first · official trailers only';
+    }
+    el('sortNote').innerHTML = MOON_SVG + '<span>' + escapeHtml(label) + '</span>';
     loadPage();
   }
 
@@ -728,6 +848,31 @@
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeModal(); });
 
   el('loadMore').addEventListener('click', loadPage);
+
+  el('modeSeg').addEventListener('click', function (e) {
+    var b = e.target.closest ? e.target.closest('button') : null;
+    if (!b || b.getAttribute('data-mode') === state.mode) return;
+    state.mode = b.getAttribute('data-mode');
+    Array.prototype.forEach.call(el('modeSeg').children, function (c) { c.classList.remove('active'); });
+    b.classList.add('active');
+    resetAndLoad();
+  });
+
+  var searchDeb;
+  el('searchInput').addEventListener('input', function () {
+    var v = this.value.trim();
+    el('searchClear').style.display = v ? 'flex' : 'none';
+    clearTimeout(searchDeb);
+    searchDeb = setTimeout(function () {
+      if (v !== state.query) { state.query = v; resetAndLoad(); }
+    }, 450);
+  });
+  el('searchClear').addEventListener('click', function () {
+    el('searchInput').value = '';
+    el('searchClear').style.display = 'none';
+    clearTimeout(searchDeb);
+    if (state.query) { state.query = ''; resetAndLoad(); }
+  });
 
   // ---- Screen time / anti-doomscroll ----
   var storedLimit = localStorage.getItem('fm_limit');
