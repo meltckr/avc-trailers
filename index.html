@@ -334,6 +334,7 @@
   var API = 'https://api.themoviedb.org/3';
   var IMG = 'https://image.tmdb.org/t/p/w342';
   var KEY_STORE = 'avc_tmdb_key';
+  var DEFAULT_KEY = '7221cbd6fca6205f03042204792228dd';
 
   var GENRES = [
     { id: 0, name: 'All' },
@@ -358,7 +359,7 @@
   ];
 
   var state = {
-    key: localStorage.getItem(KEY_STORE) || '',
+    key: localStorage.getItem(KEY_STORE) || DEFAULT_KEY,
     genre: 0,
     page: 0,
     loading: false,
